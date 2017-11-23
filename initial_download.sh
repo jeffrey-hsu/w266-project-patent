@@ -3,8 +3,9 @@
 cd
 mkdir ~/patent_data
 echo Downloading dataset...
-wget https://bulkdata.uspto.gov/data/patent/pair/economics/2016/csv.zip -P ~/patent_data/2016_csv.zip
+wget https://bulkdata.uspto.gov/data/patent/claims/economics/2014/patent_claims_fulltext.csv.zip -P ~/patent_data/
 echo Zip file downloaded.
 echo Unzipping file ... 
-unzip ~/patent_data/2016_csv.zip -d ~/patent_data/dataset
+unzip ~/patent_data/patent_claims_fulltext.csv.zip -d ~/patent_data/
+rm -f ~patent_data/patent_claims_fulltext.csv.zip
 echo Finished unzipping file.
