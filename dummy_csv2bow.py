@@ -1,4 +1,4 @@
-'''Processes patent claims and organizes them into
+'''Processes 10,000 patents' claims and organizes them into
 a bag-of-words in matrix market format. It also
 logs a dictionary for future use if needed.
 Patent numbers can be accessed later with the clump
@@ -54,7 +54,8 @@ def clump(filename):
     # Initialize values
     last_patent_number = 0
     clump_text = ''
-    
+    counter = 0
+ 
     with open(filename, 'r') as f:
     # line = [patent number, claim number, claim text, dependencies,
     # ind_flg, appl_id.]
@@ -84,6 +85,11 @@ def clump(filename):
 	                yield last_patent_number, clump_text
 		    last_patent_number = patent_no
 		    clump_text = claim_text
+                    counter += 1
+
+                if counter % 10000 == 0:
+                    break
+
     yield last_patent_number, clump_text # Output the last clump as well
 	
 base_file_path = '/home/cameronbell/'
@@ -99,9 +105,9 @@ print(time(), 'Dictionary loaded; filtering extremes.')
 # Remove frequent and infrequent words, and limit tokens to 100,000
 dictionary.filter_extremes()
 dictionary.compactify()
-dictionary.save(''.join((base_file_path, 'patent_data/dictionary.dict')))
+dictionary.save(''.join((base_file_path, 'patent_data/dummy_dictionary.dict')))
 # To load, just use the following code:
-# dictionary = corpora.Dictionary.load('.../dictionary.dict')
+# dictionary = corpora.Dictionary.load('.../dummy_dictionary.dict')
 print(time(), 'Dictionary saved.')
 
 
@@ -109,7 +115,7 @@ print(time(), 'Dictionary saved.')
 class MyCorpus(object):
     def __iter__(self):
         for i, num_and_doc in enumerate(clump(patent_claims_file)):
-            if i%10000 == 0 and i != 0:
+            if i%2000 == 0 and i != 0:
                 print('\r%i patents added to corpus. %s' %(i, time()))
 	    	sys.stdout.flush()
 	    yield dictionary.doc2bow(prune(num_and_doc[1]))
@@ -119,7 +125,7 @@ corpus = MyCorpus()
 
 # Convert the corpus to Market Matrix format and save it.
 print(time(), 'Corpus built. Converting to Market Matrix format.')
-corpora.MmCorpus.serialize(''.join((base_file_path, 'patent_data/corpus.mm')), corpus)
+corpora.MmCorpus.serialize(''.join((base_file_path, 'patent_data/dummy_corpus.mm')), corpus)
 print(time(), 'Market Matrix format saved. Process finished.')
 
 
