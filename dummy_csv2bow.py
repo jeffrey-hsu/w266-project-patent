@@ -5,6 +5,7 @@ Patent numbers can be accessed later with the clump
 function.'''
 
 # User-set values:
+base_file_path = '/home/cameronbell/' # Home directory
 number_of_patents = 1000 # Number of patents to be processed
 num_topics = 10          # Number of topics in the LSI model
 
@@ -96,7 +97,7 @@ def clump(filename):
 
     yield last_patent_number, clump_text # Output the last clump as well
 	
-base_file_path = '/home/cameronbell/'
+
 patent_claims_file = ''.join((base_file_path, 'patent_data/patent_claims_fulltext.csv'))
 
 
