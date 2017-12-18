@@ -1,33 +1,40 @@
-'''Processes patent claims and organizes them into
+'''
+Processes patent claims and organizes them into
 a bag-of-words in matrix market format. It also
 logs a dictionary for future use if needed.
 Patent numbers can be accessed later with the clump
-function.'''
-
-from gensim import utils
-import string
+function.
+'''
+import numpy as np
+from gensim import utils, corpora, models
 from nltk.stem.snowball import SnowballStemmer
 from nltk.corpus import stopwords
-from gensim import corpora
+
+import string
 from datetime import datetime
 import sys
 
 import logging
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
-################### FUNCTIONS ###################
+number_of_patents = 1000 # Number of patents to be processed
+
+################### PROCESS PATENT TEXT DOCS ###################
 def time():
     return str(datetime.now())[5:19]
 
+
 def rmPunct(dirtyStr):
-	splitCleanStr = [ch for ch in dirtyStr if ch not in string.punctuation]
-	cleanStr = ''.join(splitCleanStr)
-	return(cleanStr)
+    splitCleanStr = [ch for ch in dirtyStr if ch not in string.punctuation]
+    cleanStr = ''.join(splitCleanStr)
+    return(cleanStr)
+
 
 def prune(doc):
-    """This takes a single document and tokenizes the words, removes
+    '''
+    This takes a single document and tokenizes the words, removes
     undesirable elements, and prepares it to be loaded into a dictionary.
-    """
+    '''
     # Tokenize the document and make it lowercase
     temp = utils.simple_preprocess(doc.lower())
 
@@ -44,26 +51,25 @@ def prune(doc):
     # Stem the remaining words
     stemmer = SnowballStemmer('english')
     temp = [stemmer.stem(w) for w in temp]
-
     return temp
 
+
 def clump(filename):
-    '''Sorts through the lines, combining them according
-    to patent number, and outputs the joined text.'''
-	
+    '''
+    Sorts through the lines, combining them according
+    to patent number, and outputs the joined text.
+    '''
     # Initialize values
-    last_patent_number = 0
+    last_patent_number = -1
     clump_text = ''
+    counter = 0
     
     with open(filename, 'r') as f:
-    # line = [patent number, claim number, claim text, dependencies,
-    # ind_flg, appl_id.]
-		
+    # line = [patent number, claim number, claim text, dependencies, ind_flg, appl_id]
         for i, line in enumerate(f):
-            # Ignore the header
-	    if i == 0:
+            # Ignore header
+            if i == 0:
                 pass
-
             else:
                 # Retrieve patent number and text, according to format
                 if '"' in line:
@@ -72,69 +78,125 @@ def clump(filename):
                 else:
                     patent_no = line.split(',')[0]
                     claim_text = line.split(',')[2]
-
                 # Add to the string if it's the same patent as the last line
                 if patent_no == last_patent_number:
-	            clump_text = ' '.join((clump_text, claim_text))
-			
-	        # Output the old line if a new patent is encountered,
-	        # and reset the values for patent number and text
-	        else:
+                    clump_text = ' '.join([clump_text, claim_text])
+                
+                # Output the old line if a new patent is encountered,
+                # and reset the values for patent number and text
+                else:
                     if last_patent_number != 0:
-	                yield last_patent_number, clump_text
-		    last_patent_number = patent_no
-		    clump_text = claim_text
-    yield last_patent_number, clump_text # Output the last clump as well
-	
-base_file_path = '/home/cameronbell/'
-patent_claims_file = ''.join((base_file_path, 'patent_data/patent_claims_fulltext.csv'))
+                        yield last_patent_number, clump_text
+                    last_patent_number = patent_no
+                    clump_text = claim_text
+                    counter += 1
+                if counter % number_of_patents == 0:
+                    break
+                    
+        yield last_patent_number, clump_text # Output the last clump as well
 
 
 ################ CREATE DICTIONARY ################
-print(time(), 'Beginning to load dictionary.')
-dictionary = corpora.Dictionary(
-    (prune(doc[1])
-        for doc in clump(patent_claims_file)), prune_at = 2000000)
-print(time(), 'Dictionary loaded; filtering extremes.')
-# Remove frequent and infrequent words, and limit tokens to 100,000
-dictionary.filter_extremes()
-dictionary.compactify()
-dictionary.save(''.join((base_file_path, 'patent_data/dictionary.dict')))
-# To load, just use the following code:
-# dictionary = corpora.Dictionary.load('.../dictionary.dict')
-print(time(), 'Dictionary saved.')
+def create_bow_dict(patent_file, dictionary_path):
+    '''
+    This function creates a dictionary based on the given patent docs.
+    To load dictionary, use the following code:
+        dictionary = corpora.Dictionary.load('.../dictionary.dict')
+    
+    Arg: 
+        - patent_file: path to the patent file.
+        - dictionary_path: path intended to save the dictionary.
+          E.g. '/home/[UserName]/patent_data/dictionary.dict'
+    '''
+    print(time(), 'Beginning to load dictionary.')
+    # Create dictionary with generator that returns 1 doc at a time
+    dictionary = corpora.Dictionary((prune(doc[1]) for doc in clump(patent_file)),
+                                    prune_at = 2000000)
+    print(time(), 'Dictionary loaded. Continue to filter tokens with extreme counts.')
+    # Remove frequent and infrequent words, and limit tokens to 100,000
+    #dictionary.filter_extremes()
+    dictionary.compactify()
+    # Save dictionary
+    dictionary.save(dictionary_path)
+    print(time(), 'Dictionary saved.')
 
 
 ################## CREATE CORPUS ##################
-class MyCorpus(object):
+class BoWCorpusBuilder(object):
+    def __init__(self, patent_file, dictionary):
+        self.patent_file = patent_file
+        self.dictionary = dictionary
+    
     def __iter__(self):
-        for i, num_and_doc in enumerate(clump(patent_claims_file)):
+        for i, num_and_doc in enumerate(clump(self.patent_file)):
             if i%10000 == 0 and i != 0:
                 print('\r%i patents added to corpus. %s' %(i, time()))
-	    	sys.stdout.flush()
-	    yield dictionary.doc2bow(prune(num_and_doc[1]))
+                sys.stdout.flush()
+            yield self.dictionary.doc2bow(prune(num_and_doc[1]))
+            
 
-print(time(), 'Building corpus.')
-corpus = MyCorpus() 
-
-# Convert the corpus to Market Matrix format and save it.
-print(time(), 'Corpus built. Converting to Market Matrix format.')
-corpora.MmCorpus.serialize(''.join((base_file_path, 'patent_data/corpus.mm')), corpus)
-print(time(), 'Market Matrix format saved. Process finished.')
-
+def doc2bow(patent_file, dictionary):
+    '''
+    Args:
+        - patent_file
+        - dictionary
+    '''
+    for i, num_and_doc in enumerate(clump(patent_file)):
+        if i%10000 ==0 and i != 0:
+            print('%i patents added to corpus. %s' %(i+1, time()))
+            sys.stdout.flush()
+        if i%number_of_patents == 0 and i != 0:
+            break
+        yield dictionary.doc2bow(prune(num_and_doc[1]))
+            
+            
+def create_bow_corpus(patent_file, dictionary_path, corpus_path):
+    '''
+    Args:
+        - patent_file: patent file path.
+        - dictionary_path: dictionary file path. 
+          E.g. '/home/[UserName]/patent_data/dictionary.dict'
+        - corpus_path: intended path to save the corpus file. 
+          E.g. '/home/[UserName]/patent_data/corpus.mm'
+    '''
+    # Load dictionary
+    dictionary = corpora.Dictionary.load(dictionary_path)
+    print(time(), 'Building corpus.')
+    corpus = BoWCorpusBuilder(patent_file, dictionary) 
+    # Convert the corpus to Market Matrix format and save it.
+    print(time(), 'Corpus built. Converting to Market Matrix format.')
+    corpora.MmCorpus.serialize(corpus_path, [docbow for docbow in doc2bow(patent_file, dictionary)])
+    print(time(), 'Market Matrix format saved. Process finished.')
+    
 
 ################# CONVERT TO TFIDF #################
-### Load the Market Matrix corpus
-##mmcorpus = corpora.MmCorpus('testcorpus.mm')
-### Create the tfidf model object
-##tfidf = models.TfidfModel(mmcorpus)
-### Transform the whole corpus and save it
-##mmcorpus_tfidf = tfidf[mmcorpus]
-##corpora.MmCorpus.serialize('testcorpus_tfidf.mm', mmcorpus_tfidf)
-### Create the lsi model object
-##dictionary=corpora.Dictionary.load('testdictionary.dict')
-##lsi = models.LsiModel(mmcorpus, id2word=dictionary, num_topics=2)
-##lsi.print_topics(2)
-### Transform the whole corpus and save it
-##mmcorpus_lsi = lsi[mmcorpus]
-##corpora.MmCorpus.serialize('testcorpus_lsi.mm', mmcorpus_lsi)
+def build_tfidf(corpus_path, tfidf_corpus_path):
+    # Load the Market Matrix corpus
+    corpus = corpora.MmCorpus(corpus_path)
+    # Create TF-IDF model object
+    mod_tfidf = models.TfidfModel(corpus, normalize=True)
+    # Transform the whole corpus and save it
+    corpus_tfidf = mod_tfidf[corpus]
+    corpora.MmCorpus.serialize(tfidf_corpus_path, corpus_tfidf)
+
+    
+def build_lsi(corpus_path, dictionary_path, lsi_corpus_path, num_dim=2):
+    # Load the Market Matrix corpus
+    corpus = corpora.MmCorpus(corpus_path)
+    # Create the lsi model object
+    dictionary = corpora.Dictionary.load(dictionary_path)
+    mod_lsi = models.LsiModel(corpus, id2word=dictionary, num_topics=num_dim)
+    #lsi.print_topics(2)
+    # Transform the whole corpus and save it
+    corpus_lsi = mod_lsi[corpus]
+    corpora.MmCorpus.serialize(lsi_corpus_path, corpus_lsi)
+
+    
+################# COMPUTE DOC SIMILARITY ################# 
+def doc_cosine(doc1, doc2):
+    '''
+    Takes in 2 document vectors and compute the cosine similarity
+    '''
+    len_doc1 = np.sqrt(sum(i**2 for i in doc1))
+    len_doc2 = np.sqrt(sum(i**2 for i in doc2))
+    return np.dot(doc1, doc2) / (len_doc1 * len_doc2)
