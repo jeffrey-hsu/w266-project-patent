@@ -1,14 +1,19 @@
-'''Processes 10,000 patents' claims and organizes them into
+'''Processes number_of_patents patents claims and organizes them into
 a bag-of-words in matrix market format. It also
 logs a dictionary for future use if needed.
 Patent numbers can be accessed later with the clump
 function.'''
 
-from gensim import utils
+# User-set values:
+base_file_path = '/home/cameronbell/' # Home directory
+number_of_patents = 1000 # Number of patents to be processed
+num_topics = 10          # Number of topics in the LSI model
+
+
+from gensim import utils, corpora, models
 import string
 from nltk.stem.snowball import SnowballStemmer
 from nltk.corpus import stopwords
-from gensim import corpora
 from datetime import datetime
 import sys
 
@@ -87,12 +92,12 @@ def clump(filename):
 		    clump_text = claim_text
                     counter += 1
 
-                if counter % 10000 == 0:
+                if counter % number_of_patents == 0:
                     break
 
     yield last_patent_number, clump_text # Output the last clump as well
 	
-base_file_path = '/home/cameronbell/'
+
 patent_claims_file = ''.join((base_file_path, 'patent_data/patent_claims_fulltext.csv'))
 
 
@@ -129,18 +134,21 @@ corpora.MmCorpus.serialize(''.join((base_file_path, 'patent_data/dummy_corpus.mm
 print(time(), 'Market Matrix format saved. Process finished.')
 
 
-################# CONVERT TO TFIDF #################
-### Load the Market Matrix corpus
-##mmcorpus = corpora.MmCorpus('testcorpus.mm')
-### Create the tfidf model object
-##tfidf = models.TfidfModel(mmcorpus)
+############# CONVERT TO TFIDF AND LSI ############
+## Load the Market Matrix corpus
+mmcorpus = corpora.MmCorpus(''.join((base_file_path, 'patent_data/dummy_corpus.mm')))
+## Create the tfidf model object
+tfidf = models.TfidfModel(mmcorpus)
+## Transform the whole corpus and save it
+mmcorpus_tfidf = tfidf[mmcorpus]
+corpora.MmCorpus.serialize(''.join((base_file_path, 'patent_data/dummy_corpus_tfidf.mm')), mmcorpus_tfidf)
+## Create the lsi model object
+dictionary = corpora.Dictionary.load(''.join((base_file_path, 'patent_data/dummy_dictionary.dict')))
+lsi = models.LsiModel(mmcorpus, id2word=dictionary, num_topics=num_topics)
+num_topics_to_print = 5
+if num_topics < 5:
+    num_topics_to_print = num_topics
+lsi.print_topics(num_topics_to_print)
 ### Transform the whole corpus and save it
-##mmcorpus_tfidf = tfidf[mmcorpus]
-##corpora.MmCorpus.serialize('testcorpus_tfidf.mm', mmcorpus_tfidf)
-### Create the lsi model object
-##dictionary=corpora.Dictionary.load('testdictionary.dict')
-##lsi = models.LsiModel(mmcorpus, id2word=dictionary, num_topics=2)
-##lsi.print_topics(2)
-### Transform the whole corpus and save it
-##mmcorpus_lsi = lsi[mmcorpus]
-##corpora.MmCorpus.serialize('testcorpus_lsi.mm', mmcorpus_lsi)
+mmcorpus_lsi = lsi[mmcorpus]
+corpora.MmCorpus.serialize(''.join((base_file_path, 'patent_data/dummy_corpus_lsi.mm')), mmcorpus_lsi)
