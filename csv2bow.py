@@ -54,7 +54,7 @@ def prune(doc):
     return temp
 
 
-def clump(filename):
+def clump(filename, stopping_point=number_of_patents):
     '''
     Sorts through the lines, combining them according
     to patent number, and outputs the joined text.
@@ -90,7 +90,7 @@ def clump(filename):
                     last_patent_number = patent_no
                     clump_text = claim_text
                     counter += 1
-                if counter % number_of_patents == 0:
+                if counter % stopping_point == 0:
                     break
                     
         yield last_patent_number, clump_text # Output the last clump as well
