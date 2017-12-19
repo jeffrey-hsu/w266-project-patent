@@ -6,8 +6,8 @@ function.'''
 
 # User-set values:
 base_file_path = '/home/cameronbell/' # Home directory
-number_of_patents = 1000 # Number of patents to be processed
-num_topics = 10          # Number of topics in the LSI model
+number_of_patents = 100000 # Number of patents to be processed
+num_topics = 300          # Number of topics in the LSI model
 
 
 from gensim import utils, corpora, models
