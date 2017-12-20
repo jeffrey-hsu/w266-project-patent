@@ -17,7 +17,7 @@ import sys
 import logging
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
-number_of_patents = 1000 # Number of patents to be processed
+number_of_patents = 10000 # Number of patents to be processed
 
 ################### PROCESS PATENT TEXT DOCS ###################
 def time():
@@ -60,7 +60,7 @@ def clump(filename):
     to patent number, and outputs the joined text.
     '''
     # Initialize values
-    last_patent_number = -1
+    last_patent_number = 0
     clump_text = ''
     counter = 0
     
@@ -195,8 +195,13 @@ def build_lsi(corpus_path, dictionary_path, lsi_corpus_path, num_dim=2):
 ################# COMPUTE DOC SIMILARITY ################# 
 def doc_cosine(doc1, doc2):
     '''
-    Takes in 2 document vectors and compute the cosine similarity
+    Takes in 2 document vectors and compute the cosine similarity based on the vector values
+    Args:
+        - doc1: [(token_id, value)]
+        - doc2: [(token_id, value)]
     '''
-    len_doc1 = np.sqrt(sum(i**2 for i in doc1))
-    len_doc2 = np.sqrt(sum(i**2 for i in doc2))
-    return np.dot(doc1, doc2) / (len_doc1 * len_doc2)
+    vec_doc1 = [val for num, val in doc1]
+    vec_doc2 = [val for num, val in doc2]
+    len_doc1 = np.sqrt(sum(i**2 for i in vec_doc1))
+    len_doc2 = np.sqrt(sum(i**2 for i in vec_doc2))
+    return np.dot(vec_doc1, vec_doc2) / (len_doc1 * len_doc2)
